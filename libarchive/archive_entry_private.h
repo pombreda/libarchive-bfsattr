@@ -57,7 +57,7 @@ struct ae_beattr {
 	uint32_t type;
 	int64_t size;
 	void *data;
-}
+};
 
 /*
  * Description of an archive entry.

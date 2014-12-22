@@ -1210,8 +1210,60 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry)
 			break;
 		}
 		case 0x6542:
+		{
 			/* Be File System file attributes */
+			off_t be_offset = 0;
+			uint32_t full_size = archive_le32dec(p + offset + be_offset);
+			be_offset += 4;
+			uint8_t flags = *(uint8_t *)(p + offset + be_offset);
+			be_offset++;
+
+			if (flags & 0xfe)
+				break;
+
+			void *data;
+			if (flags & 0x01) {
+				/* Data is uncompressed, so we can contue reading where we
+				 * left off. */
+				data = (p + offset + be_offset);
+			} else {
+				/* TODO: Data is compressed, decompress it and assign the
+				 * uncompressed data to data. */
+			}
+
+			off_t data_offset = 0;
+			while (be_offset < datasize) {
+				const char *attr_name;
+				void *attr_data;
+				uint32_t attr_type;
+				int64_t attr_size;
+				attr_name = (char *)(data + data_offset);
+
+				data_offset += strlen(attr_name) + 1;
+
+				attr_type = archive_be32dec(data + data_offset);
+				data_offset += 4;
+
+				attr_size = archive_be64dec(data + data_offset);
+				data_offset += 8;
+
+				if (attr_size < 0)
+					break;
+
+				attr_data = (data + data_offset);
+				data_offset += attr_size;
+
+				/* Automatically handle endianness of whatever is in
+				 * attr_data */
+				(void)swap_data(attr_type, attr_data, attr_size,
+					B_SWAP_ENDIAN_TO_HOST);
+
+				archive_entry_beattr_add_entry(zip_entry->entry, attr_name,
+					attr_type, attr_size, attr_data);
+			}
+
 			break;
+		}
 		case 0x7855:
 			/* Info-ZIP Unix Extra Field (type 2) "Ux". */
 #ifdef DEBUG
