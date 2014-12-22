@@ -20,6 +20,7 @@ SET(libarchive_SOURCES
   archive_endian.h
   archive_entry.c
   archive_entry.h
+  archive_entry_beattr.c
   archive_entry_copy_stat.c
   archive_entry_link_resolver.c
   archive_entry_locale.h
@@ -113,6 +114,7 @@ SET(libarchive_SOURCES
   filter_fork.c
   filter_fork.h
 )
+
 
 # Man pages
 SET(libarchive_MANS

@@ -1101,3 +1101,5 @@ ENDIF(ENABLE_TEST)
 add_subdirectory(libarchive)
 add_subdirectory(tar)
 add_subdirectory(cpio)
+
+SET(CMAKE_REQUIRED_LIBRARIES "be")

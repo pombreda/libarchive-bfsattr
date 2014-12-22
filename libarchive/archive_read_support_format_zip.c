@@ -37,6 +37,8 @@ __FBSDID("$FreeBSD: head/lib/libarchive/archive_read_support_format_zip.c 201102
 #include <zlib.h>
 #endif
 
+#include <ByteOrder.h>
+
 #include "archive.h"
 #include "archive_entry.h"
 #include "archive_entry_locale.h"
@@ -138,7 +140,8 @@ static int	zip_read_local_file_header(struct archive_read *a,
     struct archive_entry *entry, struct zip *);
 static time_t	zip_time(const char *);
 static const char *compression_name(int compression);
-static void process_extra(const char *, size_t, struct zip_entry *);
+static void process_extra(const char *, size_t, struct zip_entry *,
+	struct archive_entry *);
 
 int
 archive_read_support_format_zip_streamable(struct archive *_a)
@@ -657,7 +660,7 @@ zip_read_local_file_header(struct archive_read *a, struct archive_entry *entry,
 		    "Truncated ZIP file header");
 		return (ARCHIVE_FATAL);
 	}
-	process_extra(h, extra_length, zip_entry);
+	process_extra(h, extra_length, zip_entry, entry);
 	__archive_read_consume(a, extra_length);
 
 	/* Populate some additional entry fields: */
@@ -1133,7 +1136,8 @@ archive_read_format_zip_cleanup(struct archive_read *a)
  *  triplets.  id and size are 2 bytes each.
  */
 static void
-process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry)
+process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
+	struct archive_entry *archive_entry)
 {
 	unsigned offset = 0;
 
@@ -1214,14 +1218,18 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry)
 			/* Be File System file attributes */
 			off_t be_offset = 0;
 			uint32_t full_size = archive_le32dec(p + offset + be_offset);
+			uint8_t flags;
+			off_t data_offset;
+			void *data;
+			
+			fprintf(stderr, "Entered header");
 			be_offset += 4;
-			uint8_t flags = *(uint8_t *)(p + offset + be_offset);
+			flags = *(uint8_t *)(p + offset + be_offset);
 			be_offset++;
 
 			if (flags & 0xfe)
 				break;
 
-			void *data;
 			if (flags & 0x01) {
 				/* Data is uncompressed, so we can contue reading where we
 				 * left off. */
@@ -1231,8 +1239,8 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry)
 				 * uncompressed data to data. */
 			}
 
-			off_t data_offset = 0;
-			while (be_offset < datasize) {
+			data_offset = 0;
+			while (be_offset + data_offset < datasize) {
 				const char *attr_name;
 				void *attr_data;
 				uint32_t attr_type;
@@ -1255,10 +1263,10 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry)
 
 				/* Automatically handle endianness of whatever is in
 				 * attr_data */
-				(void)swap_data(attr_type, attr_data, attr_size,
-					B_SWAP_ENDIAN_TO_HOST);
+				/*(void)swap_data(attr_type, attr_data, attr_size,
+					B_SWAP_BENDIAN_TO_HOST);*/
 
-				archive_entry_beattr_add_entry(zip_entry->entry, attr_name,
+				archive_entry_beattr_add_entry(archive_entry, attr_name,
 					attr_type, attr_size, attr_data);
 			}
 
