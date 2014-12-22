@@ -1209,6 +1209,9 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry)
 			}
 			break;
 		}
+		case 0x6542:
+			/* Be File System file attributes */
+			break;
 		case 0x7855:
 			/* Info-ZIP Unix Extra Field (type 2) "Ux". */
 #ifdef DEBUG

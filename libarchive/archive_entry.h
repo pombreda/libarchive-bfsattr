@@ -51,6 +51,7 @@
 /* These should match the types used in 'struct stat' */
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #define	__LA_INT64_T	__int64
+#define __LA_UINT32_T	unsigned __int32
 # if defined(__BORLANDC__)
 #  define	__LA_UID_T	uid_t  /* Remove in libarchive 3.2 */
 #  define	__LA_GID_T	gid_t  /* Remove in libarchive 3.2 */
@@ -66,8 +67,10 @@
 #include <unistd.h>
 # if defined(_SCO_DS)
 #  define	__LA_INT64_T	long long
+#  define	__LA_UINT32_T	unsigned int
 # else
 #  define	__LA_INT64_T	int64_t
+#  define	__LA_UINT32_T	uint32_t
 # endif
 # define	__LA_UID_T	uid_t /* Remove in libarchive 3.2 */
 # define	__LA_GID_T	gid_t /* Remove in libarchive 3.2 */
@@ -530,6 +533,19 @@ __LA_DECL int	archive_entry_sparse_count(struct archive_entry *);
 __LA_DECL int	archive_entry_sparse_reset(struct archive_entry *);
 __LA_DECL int	archive_entry_sparse_next(struct archive_entry *,
 	    __LA_INT64_T * /* offset */, __LA_INT64_T * /* length */);
+
+
+/* BFS file attributes */
+
+__LA_DECL void	archive_entry_beattr_clear(struct archive_entry *);
+__LA_DECL void	archive_entry_beattr_add_entry(struct archive_entry *,
+	const char * /* name */, __LA_UINT32_T /* type */,
+	__LA_INT64_T /* size */, const void * /* data */);
+__LA_DECL int	archive_entry_beattr_count(struct archive_entry *);
+__LA_DECL int	archive_entry_beattr_reset(struct archive_entry *);
+__LA_DECL int	archive_entry_beattr_next(struct archive_entry *,
+	const char ** /* name */, __LA_UINT32_T * /* type */,
+	__LA_INT64_T * /* size */, const void ** /* data */);
 
 /*
  * Utility to match up hardlinks.

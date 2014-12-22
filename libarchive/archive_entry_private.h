@@ -50,6 +50,15 @@ struct ae_sparse {
 	int64_t	 length;
 };
 
+struct ae_beattr {
+	struct ae_beattr *next;
+
+	char *name;
+	uint32_t type;
+	int64_t size;
+	void *data;
+}
+
 /*
  * Description of an archive entry.
  *
@@ -168,6 +177,10 @@ struct archive_entry {
 	struct ae_sparse *sparse_head;
 	struct ae_sparse *sparse_tail;
 	struct ae_sparse *sparse_p;
+
+	/* Be File System file attribute support */
+	struct ae_beattr *beattr_head;
+	struct ae_beattr *beattr_p;
 
 	/* Miscellaneous. */
 	char		 strmode[12];
