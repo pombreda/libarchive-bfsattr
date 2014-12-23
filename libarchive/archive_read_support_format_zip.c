@@ -1376,7 +1376,8 @@ inflate_be_field(const void *in, size_t in_size, void *out, size_t out_size)
 	stream.avail_in = Z_NULL;
 	stream.next_in = Z_NULL;
 
-	ret = inflateInit(&stream);
+
+	ret = inflateInit2(&stream, -15);
 
 	if (ret != Z_OK)
 		return ARCHIVE_WARN;
