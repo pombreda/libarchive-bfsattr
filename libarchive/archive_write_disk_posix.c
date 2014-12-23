@@ -118,6 +118,8 @@ __FBSDID("$FreeBSD$");
 #endif
 #endif
 
+#include <fs_attr.h>
+
 /* TODO: Support Mac OS 'quarantine' feature.  This is really just a
  * standard tag to mark files that have been downloaded as "tainted".
  * On Mac OS, we should mark the extracted files as tainted if the
@@ -288,6 +290,7 @@ static int	set_times_from_entry(struct archive_write_disk *);
 static struct fixup_entry *sort_dir_list(struct fixup_entry *p);
 static ssize_t	write_data_block(struct archive_write_disk *,
 		    const char *, size_t);
+static int set_beattrs(struct archive_write_disk *);
 
 static struct archive_vtable *archive_write_disk_vtable(void);
 
@@ -382,6 +385,8 @@ _archive_write_disk_header(struct archive *_a, struct archive_entry *entry)
 	struct archive_write_disk *a = (struct archive_write_disk *)_a;
 	struct fixup_entry *fe;
 	int ret, r;
+
+	fprintf(stderr, "Yes!!!!!");
 
 	archive_check_magic(&a->archive, ARCHIVE_WRITE_DISK_MAGIC,
 	    ARCHIVE_STATE_HEADER | ARCHIVE_STATE_DATA,
@@ -881,6 +886,12 @@ _archive_write_disk_finish_entry(struct archive *_a)
 		int r2 = set_acls(a, a->fd,
 				  archive_entry_pathname(a->entry),
 				  archive_entry_acl(a->entry));
+		if (r2 < ret) ret = r2;
+	}
+
+	/* TODO: do TODO_BEATTR */
+	{
+		int r2 = set_beattrs(a);
 		if (r2 < ret) ret = r2;
 	}
 
@@ -2798,6 +2809,32 @@ set_xattrs(struct archive_write_disk *a)
 	return (ARCHIVE_OK);
 }
 #endif
+
+static int
+set_beattrs(struct archive_write_disk *a)
+{
+	int ret = ARCHIVE_OK;
+	if (a->fd >= 0 && archive_entry_beattr_count(a->entry) > 0)
+	{
+		const char *name;
+		uint32_t type;
+		int64_t size;
+		const void *data;
+
+		(void)archive_entry_beattr_reset(a->entry);
+		while (archive_entry_beattr_next(a->entry, &name, &type, &size, &data)
+			== ARCHIVE_OK)
+		{
+			ssize_t wrote = fs_write_attr(a->fd, name, type, 0, data, size);
+			if (wrote != size)
+			{
+				ret = ARCHIVE_WARN;
+				fprintf(stderr, "Error writing attribtue");
+			}
+		}
+	}
+	return ret;
+}
 
 /*
  * Test if file on disk is older than entry.
