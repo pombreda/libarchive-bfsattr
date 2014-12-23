@@ -142,6 +142,7 @@ static time_t	zip_time(const char *);
 static const char *compression_name(int compression);
 static void process_extra(const char *, size_t, struct zip_entry *,
 	struct archive_entry *);
+static int inflate_be_field(const void *, size_t, void *, size_t);
 
 int
 archive_read_support_format_zip_streamable(struct archive *_a)
@@ -1230,17 +1231,52 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 			if (flags & 0xfe)
 				break;
 
+			data = malloc(full_size);
+
+			if (data == NULL)
+				break;
+
 			if (flags & 0x01) {
-				/* Data is uncompressed, so we can contue reading where we
+				/* Data is uncompressed, so we can continue reading where we
 				 * left off. */
-				data = (p + offset + be_offset);
+				(void)memcpy(data, p + offset + be_offset,
+					datasize - be_offset);
 			} else {
-				/* TODO: Data is compressed, decompress it and assign the
-				 * uncompressed data to data. */
+				/* Data is compressed */
+				uint16_t method;
+				uint32_t hash; /* crc32 checksum. TODO: validate it. */
+				int r = ARCHIVE_OK;
+
+				fprintf(stderr, "Noticed compressed\n");
+				method = archive_le16dec(p + offset + be_offset);
+				be_offset += 2;
+				hash = archive_le32dec(p + offset + be_offset);
+				be_offset += 4;
+
+				switch (method) {
+				case 1: /* STORED */
+					fprintf(stderr, "Method stored\n");
+					(void)memcpy(data, p + offset + be_offset,
+						datasize - be_offset);
+					break;
+				case 8: /* DEFLATED */
+				case 9: /* ENHDEFLATED */
+					fprintf(stderr, "Method deflated\n");
+					r = inflate_be_field(p + offset + be_offset,
+						datasize - be_offset, data, full_size);
+					break;
+				default:
+					fprintf(stderr, "Method default\n");
+					/* We do not know the compression type */
+					r = ARCHIVE_WARN;
+					break;
+				}
+				if (r != ARCHIVE_OK)
+					break;
 			}
 
 			data_offset = 0;
-			while (be_offset + data_offset < datasize) {
+			while (data_offset < full_size) {
 				const char *attr_name;
 				void *attr_data;
 				uint32_t attr_type;
@@ -1326,4 +1362,46 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 		    "Extra data field contents do not match reported size!\n");
 	}
 #endif
+}
+
+static int
+inflate_be_field(const void *in, size_t in_size, void *out, size_t out_size)
+{
+	int ret;
+	z_stream stream;
+
+	stream.zalloc = Z_NULL;
+	stream.zfree = Z_NULL;
+	stream.opaque = Z_NULL;
+	stream.avail_in = Z_NULL;
+	stream.next_in = Z_NULL;
+
+	ret = inflateInit(&stream);
+
+	if (ret != Z_OK)
+		return ARCHIVE_WARN;
+
+	fprintf(stderr, "Stream successfully initialized.");
+	stream.avail_in = in_size;
+
+	/* This cast is explained in line 982 onwards. */
+	stream.next_in = (Bytef *)(uintptr_t)(const void *)in;
+
+	stream.avail_out = out_size;
+	stream.next_out = out;
+
+	ret = inflate(&stream, Z_PARTIAL_FLUSH);
+
+	(void)inflateEnd(&stream);
+
+	if (ret == Z_NEED_DICT)
+		fprintf(stderr, "Z_NEED_DICT");
+	if (ret == Z_DATA_ERROR)
+		fprintf(stderr, "Z_DATA_ERROR");
+	if (ret != Z_NEED_DICT && ret != Z_DATA_ERROR && ret != Z_MEM_ERROR) {
+		return ARCHIVE_OK;
+	} else {
+		fprintf(stderr, "Failed inflating\n");
+		return ARCHIVE_WARN;
+	}
 }

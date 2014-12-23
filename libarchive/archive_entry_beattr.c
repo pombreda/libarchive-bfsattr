@@ -4,10 +4,6 @@
  * Distributed under the terms of the MIT license
  */
 
-/* xattr does a lof of #ifdefs here. I am not sure why that is, since compiling
- * fails anyway if the files are not included at all (Maybe this statement is
- * very false). */
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
