@@ -1223,7 +1223,6 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 			off_t data_offset;
 			void *data;
 			
-			fprintf(stderr, "Entered header");
 			be_offset += 4;
 			flags = *(uint8_t *)(p + offset + be_offset);
 			be_offset++;
@@ -1247,7 +1246,6 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 				uint32_t hash; /* crc32 checksum. TODO: validate it. */
 				int r = ARCHIVE_OK;
 
-				fprintf(stderr, "Noticed compressed\n");
 				method = archive_le16dec(p + offset + be_offset);
 				be_offset += 2;
 				hash = archive_le32dec(p + offset + be_offset);
@@ -1255,24 +1253,23 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 
 				switch (method) {
 				case 1: /* STORED */
-					fprintf(stderr, "Method stored\n");
 					(void)memcpy(data, p + offset + be_offset,
 						datasize - be_offset);
 					break;
 				case 8: /* DEFLATED */
 				case 9: /* ENHDEFLATED */
-					fprintf(stderr, "Method deflated\n");
 					r = inflate_be_field(p + offset + be_offset,
 						datasize - be_offset, data, full_size);
 					break;
 				default:
-					fprintf(stderr, "Method default\n");
 					/* We do not know the compression type */
 					r = ARCHIVE_WARN;
 					break;
 				}
-				if (r != ARCHIVE_OK)
+				if (r != ARCHIVE_OK) {
+					free(data);
 					break;
+				}
 			}
 
 			data_offset = 0;
@@ -1305,7 +1302,7 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 				archive_entry_beattr_add_entry(archive_entry, attr_name,
 					attr_type, attr_size, attr_data);
 			}
-
+			free(data);
 			break;
 		}
 		case 0x7855:
@@ -1382,7 +1379,6 @@ inflate_be_field(const void *in, size_t in_size, void *out, size_t out_size)
 	if (ret != Z_OK)
 		return ARCHIVE_WARN;
 
-	fprintf(stderr, "Stream successfully initialized.");
 	stream.avail_in = in_size;
 
 	/* This cast is explained in line 982 onwards. */
@@ -1395,14 +1391,9 @@ inflate_be_field(const void *in, size_t in_size, void *out, size_t out_size)
 
 	(void)inflateEnd(&stream);
 
-	if (ret == Z_NEED_DICT)
-		fprintf(stderr, "Z_NEED_DICT");
-	if (ret == Z_DATA_ERROR)
-		fprintf(stderr, "Z_DATA_ERROR");
 	if (ret != Z_NEED_DICT && ret != Z_DATA_ERROR && ret != Z_MEM_ERROR) {
 		return ARCHIVE_OK;
 	} else {
-		fprintf(stderr, "Failed inflating\n");
 		return ARCHIVE_WARN;
 	}
 }

@@ -386,8 +386,6 @@ _archive_write_disk_header(struct archive *_a, struct archive_entry *entry)
 	struct fixup_entry *fe;
 	int ret, r;
 
-	fprintf(stderr, "Yes!!!!!");
-
 	archive_check_magic(&a->archive, ARCHIVE_WRITE_DISK_MAGIC,
 	    ARCHIVE_STATE_HEADER | ARCHIVE_STATE_DATA,
 	    "archive_write_disk_header");
@@ -2829,7 +2827,6 @@ set_beattrs(struct archive_write_disk *a)
 			if (wrote != size)
 			{
 				ret = ARCHIVE_WARN;
-				fprintf(stderr, "Error writing attribtue");
 			}
 		}
 	}

@@ -34,8 +34,6 @@ archive_entry_beattr_add_entry(struct archive_entry *entry, const char *name,
 	uint32_t type, int64_t size, const void *data)
 {
 	struct ae_beattr *tmp;
-	fprintf(stderr, "Entered function for ");
-	fprintf(stderr, name);
 	tmp = (struct ae_beattr *)malloc(sizeof(struct ae_beattr));
 
 	if (tmp == NULL)
@@ -45,23 +43,15 @@ archive_entry_beattr_add_entry(struct archive_entry *entry, const char *name,
 	tmp->type = type;
 
 	tmp->data = malloc(size);
-	fprintf(stderr, "After second malloc\n");
 	if (tmp->data != NULL) {
-		fprintf(stderr, "Before memcpy\n");
 		memcpy(tmp->data, data, size);
-		fprintf(stderr, "After memcpy\n");
 		tmp->size = size;
 	} else {
-		fprintf(stderr, "Wring branch\n");
 		/* if malloc fails here, do not fail, but treat the attribute as if
 		 * it had no data */
 		tmp->size = 0;
 	}
 
-	if (entry == NULL)
-	{
-		fprintf(stderr, "Entry is NULL!!");
-	}
 	/* Put the new element at the beginning of the linked list */
 	tmp->next = entry->beattr_head;
 	entry->beattr_head = tmp;
