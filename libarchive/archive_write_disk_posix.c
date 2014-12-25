@@ -118,8 +118,9 @@ __FBSDID("$FreeBSD$");
 #endif
 #endif
 
+#ifdef __HAIKU__
 #include <fs_attr.h>
-
+#endif
 /* TODO: Support Mac OS 'quarantine' feature.  This is really just a
  * standard tag to mark files that have been downloaded as "tainted".
  * On Mac OS, we should mark the extracted files as tainted if the
@@ -290,7 +291,10 @@ static int	set_times_from_entry(struct archive_write_disk *);
 static struct fixup_entry *sort_dir_list(struct fixup_entry *p);
 static ssize_t	write_data_block(struct archive_write_disk *,
 		    const char *, size_t);
+
+#ifdef __HAIKU__
 static int set_beattrs(struct archive_write_disk *);
+#endif
 
 static struct archive_vtable *archive_write_disk_vtable(void);
 
@@ -887,11 +891,12 @@ _archive_write_disk_finish_entry(struct archive *_a)
 		if (r2 < ret) ret = r2;
 	}
 
-	/* TODO: do TODO_BEATTR */
+#ifdef __HAIKU__
 	{
 		int r2 = set_beattrs(a);
 		if (r2 < ret) ret = r2;
 	}
+#endif
 
 	/* If there's an fd, we can close it now. */
 	if (a->fd >= 0) {
@@ -2808,6 +2813,7 @@ set_xattrs(struct archive_write_disk *a)
 }
 #endif
 
+#ifdef __HAIKU__
 static int
 set_beattrs(struct archive_write_disk *a)
 {
@@ -2832,6 +2838,7 @@ set_beattrs(struct archive_write_disk *a)
 	}
 	return ret;
 }
+#endif
 
 /*
  * Test if file on disk is older than entry.

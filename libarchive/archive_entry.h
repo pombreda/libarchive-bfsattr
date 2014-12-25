@@ -535,6 +535,7 @@ __LA_DECL int	archive_entry_sparse_next(struct archive_entry *,
 	    __LA_INT64_T * /* offset */, __LA_INT64_T * /* length */);
 
 
+#ifdef __HAIKU__
 /* BFS file attributes */
 
 __LA_DECL void	archive_entry_beattr_clear(struct archive_entry *);
@@ -547,6 +548,7 @@ __LA_DECL int	archive_entry_beattr_next(struct archive_entry *,
 	const char ** /* name */, __LA_UINT32_T * /* type */,
 	__LA_INT64_T * /* size */, const void ** /* data */);
 
+#endif
 /*
  * Utility to match up hardlinks.
  *

@@ -4,12 +4,12 @@
  * Distributed under the terms of the MIT license
  */
 
+#ifdef __HAIKU__
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include "archive_platform.h"
-#include "archive.h"
-#include "archive_private.h"
 #include "archive_entry.h"
 #include "archive_entry_private.h"
 
@@ -101,3 +101,4 @@ archive_entry_beattr_next(struct archive_entry *entry, const char **name,
 		return ARCHIVE_WARN;
 	}
 }
+#endif /* __HAIKU__ */

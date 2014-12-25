@@ -73,7 +73,9 @@ __FBSDID("$FreeBSD: head/lib/libarchive/archive_write_set_format_zip.c 201168 20
 #include "archive_private.h"
 #include "archive_write_private.h"
 
+#ifdef __HAIKU__
 #include <fs_attr.h>
+#endif
 
 #ifndef HAVE_ZLIB_H
 #include "archive_crc32.h"
@@ -338,6 +340,7 @@ is_all_ascii(const char *p)
 	return (1);
 }
 
+#ifdef __HAIKU__
 #define BE_FIELD_INITIAL_BUFFER_SIZE 64
 
 static int
@@ -420,6 +423,7 @@ archive_format_be_field(struct archive_entry *entry,
 
 	return ARCHIVE_OK;
 }
+#endif /* __HAIKU__ */
 
 static int
 archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
@@ -433,10 +437,12 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 	int ret, ret2 = ARCHIVE_OK;
 	int64_t size;
 	mode_t type;
-	struct be_attr_extra_field be;
 	void *be_buffer = NULL;
 	size_t be_size;
+#ifdef __HAIKU__
 	int be_ret;
+	struct be_attr_extra_field be;
+#endif
 
 	/* Entries other than a regular file or a folder are skipped. */
 	type = archive_entry_filetype(entry);
@@ -579,11 +585,13 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 
 	be_size = 0;
 
+#ifdef __HAIKU__
 	be_ret = archive_format_be_field(entry, &be, &be_buffer);
 	if (be_ret == ARCHIVE_OK)
 	{
 		be_size = archive_le32dec(be.ef_size) + 4;
 	}
+#endif
 
 	/* Formatting extra data. */
 	archive_le16enc(&h.extra_length, sizeof(e) + be_size);
@@ -622,6 +630,7 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 		goto cleanup_fatal;
 	zip->written_bytes += sizeof(e);
 
+#ifdef __HAIKU__
 	if (be_ret == ARCHIVE_OK) {
 		ret = __archive_write_output(a, &be, sizeof(be));
 		if (ret != ARCHIVE_OK)
@@ -634,6 +643,7 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 			goto cleanup_fatal;
 		zip->written_bytes += archive_le16dec(be.ef_size) - 5;
 	}
+#endif
 
 	free(be_buffer);
 

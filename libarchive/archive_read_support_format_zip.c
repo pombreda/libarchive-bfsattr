@@ -1214,6 +1214,7 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 			}
 			break;
 		}
+#ifdef __HAIKU__
 		case 0x6542:
 		{
 			/* Be File System file attributes */
@@ -1293,18 +1294,13 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 
 				attr_data = (data + data_offset);
 				data_offset += attr_size;
-
-				/* Automatically handle endianness of whatever is in
-				 * attr_data */
-				/*(void)swap_data(attr_type, attr_data, attr_size,
-					B_SWAP_BENDIAN_TO_HOST);*/
-
 				archive_entry_beattr_add_entry(archive_entry, attr_name,
 					attr_type, attr_size, attr_data);
 			}
 			free(data);
 			break;
 		}
+#endif /* __HAIKU__ */
 		case 0x7855:
 			/* Info-ZIP Unix Extra Field (type 2) "Ux". */
 #ifdef DEBUG
@@ -1361,6 +1357,7 @@ process_extra(const char *p, size_t extra_length, struct zip_entry* zip_entry,
 #endif
 }
 
+#ifdef __HAIKU__
 static int
 inflate_be_field(const void *in, size_t in_size, void *out, size_t out_size)
 {
@@ -1397,3 +1394,4 @@ inflate_be_field(const void *in, size_t in_size, void *out, size_t out_size)
 		return ARCHIVE_WARN;
 	}
 }
+#endif /* __HAIKU__ */

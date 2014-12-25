@@ -178,9 +178,11 @@ struct archive_entry {
 	struct ae_sparse *sparse_tail;
 	struct ae_sparse *sparse_p;
 
+#ifdef __HAIKU__
 	/* Be File System file attribute support */
 	struct ae_beattr *beattr_head;
 	struct ae_beattr *beattr_p;
+#endif
 
 	/* Miscellaneous. */
 	char		 strmode[12];

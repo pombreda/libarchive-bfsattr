@@ -166,7 +166,9 @@ archive_entry_clear(struct archive_entry *entry)
 	archive_acl_clear(&entry->acl);
 	archive_entry_xattr_clear(entry);
 	archive_entry_sparse_clear(entry);
+#ifdef __HAIKU__
 	archive_entry_beattr_clear(entry);
+#endif
 	free(entry->stat);
 	memset(entry, 0, sizeof(*entry));
 	return entry;
@@ -178,7 +180,9 @@ archive_entry_clone(struct archive_entry *entry)
 	struct archive_entry *entry2;
 	struct ae_xattr *xp;
 	struct ae_sparse *sp;
+#ifdef __HAIKU__
 	struct ae_beattr *be;
+#endif
 	size_t s;
 	const void *p;
 
@@ -226,6 +230,7 @@ archive_entry_clone(struct archive_entry *entry)
 		sp = sp->next;
 	}
 
+#ifdef __HAIKU__
 	/* Copy beattr data */
 	be = entry->beattr_head;
 	while (be != NULL) {
@@ -233,6 +238,7 @@ archive_entry_clone(struct archive_entry *entry)
 			be->name, be->type, be->size, be->data);
 		be = be->next;
 	}
+#endif
 
 	return (entry2);
 }
