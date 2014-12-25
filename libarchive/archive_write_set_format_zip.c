@@ -363,12 +363,15 @@ archive_format_be_field(struct archive_entry *entry,
 		return ARCHIVE_WARN;
 
 	while ((ent = fs_read_attr_dir(attrdir)) != NULL) {
+		size_t complete_size;
 		fs_stat_attr(fd, ent->d_name, &info);
 
+		complete_size = buffer_pos + strlen(ent->d_name) + 1 +
+			sizeof(attr_info) + info.size;
 		/* If the buffer does not have enough space, get some more */
-		if (buffer_pos + strlen(ent->d_name) + 1 +
-				sizeof(attr_info) + info.size >= buffer_size) {
-			buffer_size *= 2;
+		if (complete_size >= buffer_size) {
+			buffer_size = complete_size > 2 * buffer_size ? complete_size :
+				2 * buffer_size;
 
 			tmp_buffer = (uint8_t *)realloc(p_buffer, buffer_size);
 
