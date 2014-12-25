@@ -73,6 +73,8 @@ __FBSDID("$FreeBSD: head/lib/libarchive/archive_write_set_format_zip.c 201168 20
 #include "archive_private.h"
 #include "archive_write_private.h"
 
+#include <fs_attr.h>
+
 #ifndef HAVE_ZLIB_H
 #include "archive_crc32.h"
 #endif
@@ -162,6 +164,18 @@ struct zip_extra_data_local {
 	char unix_uid[4];
 	char unix_gid_size;
 	char unix_gid[4];
+};
+
+/*
+ * This, as well as the data it describes, also counts towards extra_length.
+ * It is separated from zip_extra_data_local, because it does not always
+ * get written.
+ */
+struct be_attr_extra_field {
+	char magic[2];
+	char ef_size[2];
+	char full_size[4];
+	char flag;
 };
 
 struct zip_extra_data_central {
@@ -324,6 +338,86 @@ is_all_ascii(const char *p)
 	return (1);
 }
 
+#define BE_FIELD_INITIAL_BUFFER_SIZE 64
+
+static int
+archive_format_be_field(struct archive_entry *entry,
+	struct be_attr_extra_field *field_info, void **buffer)
+{
+	const char *filename = archive_entry_sourcepath(entry);
+	attr_info info;
+	dirent_t *ent;
+	int fd = open(filename, O_RDONLY);
+	uint8_t *p_buffer, *tmp_buffer;
+	size_t buffer_size = BE_FIELD_INITIAL_BUFFER_SIZE;
+	off_t buffer_pos = 0;
+
+	DIR *attrdir = fs_fopen_attr_dir(fd);
+
+	p_buffer = (uint8_t *)malloc(buffer_size);
+	
+	if (p_buffer == NULL)
+		return ARCHIVE_WARN;
+
+	if (attrdir == NULL)
+		return ARCHIVE_WARN;
+
+	while ((ent = fs_read_attr_dir(attrdir)) != NULL) {
+		fs_stat_attr(fd, ent->d_name, &info);
+
+		/* If the buffer does not have enough space, get some more */
+		if (buffer_pos + strlen(ent->d_name) + 1 +
+				sizeof(attr_info) + info.size >= buffer_size) {
+			buffer_size *= 2;
+
+			tmp_buffer = (uint8_t *)realloc(p_buffer, buffer_size);
+
+			if (tmp_buffer == NULL) {
+				free(p_buffer);
+				return ARCHIVE_WARN;
+			} else {
+				p_buffer = tmp_buffer;
+			}
+		}
+		strcpy(p_buffer + buffer_pos, ent->d_name);
+		buffer_pos += strlen(ent->d_name) + 1;
+
+		archive_be32enc(p_buffer + buffer_pos, info.type);
+		buffer_pos += 4;
+
+		archive_be64enc(p_buffer + buffer_pos, info.size);
+		buffer_pos += 8;
+
+		fs_read_attr(fd, ent->d_name, info.type, 0, p_buffer + buffer_pos,
+			info.size);
+		buffer_pos += info.size;
+	}
+
+	/* No need to write the extra field. Not really a failurestate, but this
+	 * way we get the point across */
+	if (buffer_pos == 0)
+		return ARCHIVE_WARN;
+
+	tmp_buffer = (uint8_t *)realloc(p_buffer, buffer_pos);
+	if (tmp_buffer != NULL)
+		p_buffer = tmp_buffer;
+
+	/* We could DEFLATE the data here, but right now we don't do that */
+
+	field_info->magic[0] = 0x42;
+	field_info->magic[1] = 0x65;
+
+	/* For uncompressed data, ef_size and full_size are always equal */
+	archive_le16enc(&field_info->ef_size, 5 + buffer_pos);
+	archive_le32enc(&field_info->full_size, buffer_pos);
+
+	field_info->flag = 0x01;
+
+	*buffer = p_buffer;
+
+	return ARCHIVE_OK;
+}
+
 static int
 archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 {
@@ -336,6 +430,10 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 	int ret, ret2 = ARCHIVE_OK;
 	int64_t size;
 	mode_t type;
+	struct be_attr_extra_field be;
+	void *be_buffer = NULL;
+	size_t be_size;
+	int be_ret;
 
 	/* Entries other than a regular file or a folder are skipped. */
 	type = archive_entry_filetype(entry);
@@ -476,8 +574,16 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 #endif
 	}
 
+	be_size = 0;
+
+	be_ret = archive_format_be_field(entry, &be, &be_buffer);
+	if (be_ret == ARCHIVE_OK)
+	{
+		be_size = archive_le32dec(be.ef_size) + 4;
+	}
+
 	/* Formatting extra data. */
-	archive_le16enc(&h.extra_length, sizeof(e));
+	archive_le16enc(&h.extra_length, sizeof(e) + be_size);
 	archive_le16enc(&e.time_id, ZIP_SIGNATURE_EXTRA_TIMESTAMP);
 	archive_le16enc(&e.time_size, sizeof(e.time_flag) +
 	    sizeof(e.mtime) + sizeof(e.atime) + sizeof(e.ctime));
@@ -500,18 +606,33 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 
 	ret = __archive_write_output(a, &h, sizeof(h));
 	if (ret != ARCHIVE_OK)
-		return (ARCHIVE_FATAL);
+		goto cleanup_fatal;
 	zip->written_bytes += sizeof(h);
 
 	ret = write_path(l->entry, a);
 	if (ret <= ARCHIVE_OK)
-		return (ARCHIVE_FATAL);
+		goto cleanup_fatal;
 	zip->written_bytes += ret;
 
 	ret = __archive_write_output(a, &e, sizeof(e));
 	if (ret != ARCHIVE_OK)
-		return (ARCHIVE_FATAL);
+		goto cleanup_fatal;
 	zip->written_bytes += sizeof(e);
+
+	if (be_ret == ARCHIVE_OK) {
+		ret = __archive_write_output(a, &be, sizeof(be));
+		if (ret != ARCHIVE_OK)
+			goto cleanup_fatal;
+		zip->written_bytes += sizeof(be);
+	
+		ret = __archive_write_output(a, be_buffer,
+			archive_le16dec(be.ef_size) - 5);
+		if (ret != ARCHIVE_OK)
+			goto cleanup_fatal;
+		zip->written_bytes += archive_le16dec(be.ef_size) - 5;
+	}
+
+	free(be_buffer);
 
 	if (type == AE_IFLNK) {
 		const unsigned char *p;
@@ -527,6 +648,10 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 	if (ret2 != ARCHIVE_OK)
 		return (ret2);
 	return (ARCHIVE_OK);
+
+cleanup_fatal:
+	free(be_buffer);
+	return ARCHIVE_FATAL;
 }
 
 static ssize_t
