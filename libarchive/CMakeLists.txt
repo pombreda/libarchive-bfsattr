@@ -115,7 +115,6 @@ SET(libarchive_SOURCES
   filter_fork.h
 )
 
-
 # Man pages
 SET(libarchive_MANS
   archive_entry.3
