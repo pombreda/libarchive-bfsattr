@@ -2832,6 +2832,8 @@ set_beattrs(struct archive_write_disk *a)
 			ssize_t wrote = fs_write_attr(a->fd, name, type, 0, data, size);
 			if (wrote != size)
 			{
+				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
+					"Could not write extended attribute to file");
 				ret = ARCHIVE_WARN;
 			}
 		}

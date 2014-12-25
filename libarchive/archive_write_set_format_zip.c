@@ -344,7 +344,7 @@ is_all_ascii(const char *p)
 #define BE_FIELD_INITIAL_BUFFER_SIZE 64
 
 static int
-archive_format_be_field(struct archive_entry *entry,
+archive_format_be_field(struct archive_write *a, struct archive_entry *entry,
 	struct be_attr_extra_field *field_info, void **buffer)
 {
 	const char *filename = archive_entry_sourcepath(entry);
@@ -359,11 +359,17 @@ archive_format_be_field(struct archive_entry *entry,
 
 	p_buffer = (uint8_t *)malloc(buffer_size);
 	
-	if (p_buffer == NULL)
+	if (p_buffer == NULL) {
+		archive_set_error(&a->archive, ENOMEM,
+			"Could not allocate memory for Be attributes");
 		return ARCHIVE_WARN;
+	}
 
-	if (attrdir == NULL)
+	if (attrdir == NULL) {
+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
+			"Could not read Be attributes from disk");
 		return ARCHIVE_WARN;
+	}
 
 	while ((ent = fs_read_attr_dir(attrdir)) != NULL) {
 		size_t complete_size;
@@ -380,6 +386,8 @@ archive_format_be_field(struct archive_entry *entry,
 
 			if (tmp_buffer == NULL) {
 				free(p_buffer);
+				archive_set_error(&a->archive, ENOMEM,
+					"Could not allocate memory for Be attributes");
 				return ARCHIVE_WARN;
 			} else {
 				p_buffer = tmp_buffer;
@@ -586,7 +594,7 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 	be_size = 0;
 
 #ifdef __HAIKU__
-	be_ret = archive_format_be_field(entry, &be, &be_buffer);
+	be_ret = archive_format_be_field(a, entry, &be, &be_buffer);
 	if (be_ret == ARCHIVE_OK)
 	{
 		be_size = archive_le32dec(be.ef_size) + 4;
